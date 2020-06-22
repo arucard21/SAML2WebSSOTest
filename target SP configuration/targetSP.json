@@ -1,0 +1,18 @@
+{
+	startPage: "<url>",
+	clockSkew: 0,
+	metadata: "<string>",
+	loginStatuscode: 200,
+	loginURL: "<url>",
+	loginContent: "<regex>",
+	loginCookies: [ {name: "<name>", value: <value>} ],
+	attributes: [
+	{ namespace: "<namespace>", prefix: "<prefix>", attributeName: "<name>", nameFormat: "<nameformat>", friendlyName: "<friendlyname>", attributeValue: "<value>", customAttributes:[ { name: "<customname>", value: "<customvalue>" } ] }
+	],
+	preLoginInteractions: [
+		{ interactionType: "<form/link/element>", lookupAttribute: "<id/name/href/text>", lookupValue: "<value>" }
+	],
+	postResponseInteractions: [
+		{ interactionType: "<form/link/element>", lookupAttribute: "<id/name/href/text>", lookupValue: "<value>", submitName: "<name>", inputs: [ { name: "<inputname>", value: "<inputvalue>" } ] }
+	]
+}
