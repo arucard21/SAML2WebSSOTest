@@ -1261,10 +1261,10 @@ public class SAML2Int extends SPTestSuite {
 			for (int i = 0; i < contactPersons.getLength(); i++){
 				Node contactPerson = contactPersons.item(i);
 				String contactType = contactPerson.getAttributes().getNamedItem(ContactPerson.CONTACT_TYPE_ATTRIB_NAME).getNodeValue();
-				if (contactType.equals(ContactPersonTypeEnumeration.SUPPORT)) {
+				if (contactType.equals(ContactPersonTypeEnumeration.SUPPORT.toString())) {
 					supportFound = true;
 				}
-				else if (contactType.equals(ContactPersonTypeEnumeration.TECHNICAL)){
+				else if (contactType.equals(ContactPersonTypeEnumeration.TECHNICAL.toString())){
 					technicalFound = true;
 				}
 			}
@@ -1847,7 +1847,7 @@ public class SAML2Int extends SPTestSuite {
 			for (int i = 0; i < requestedAuthnContexts.getLength(); i++){
 				Node comparison = requestedAuthnContexts.item(i).getAttributes().getNamedItem(RequestedAuthnContext.COMPARISON_ATTRIB_NAME);
 				if (comparison != null){
-					if (!comparison.getNodeValue().equals(AuthnContextComparisonTypeEnumeration.EXACT)){
+					if (!comparison.getNodeValue().equals(AuthnContextComparisonTypeEnumeration.EXACT.toString())){
 						resultMessage = "The Service Provider's Authentication Request contains a RequestedAuthnContext with a Comparison attribute that is not set to exact";
 						return false;
 					}

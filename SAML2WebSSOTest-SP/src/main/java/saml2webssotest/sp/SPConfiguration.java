@@ -12,8 +12,8 @@ import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
 import saml2webssotest.common.Interaction;
-import saml2webssotest.common.StringPair;
 import saml2webssotest.common.SAMLAttribute;
+import saml2webssotest.common.StringPair;
 
 public class SPConfiguration {
 	/**

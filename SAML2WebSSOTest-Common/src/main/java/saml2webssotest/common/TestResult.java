@@ -87,6 +87,6 @@ public class TestResult {
 	@Override
 	public int hashCode() {
 		// return non-negative hashcode
-		return Math.abs(new Boolean(getResult()).hashCode()+getResultMessage().hashCode()+getName().hashCode()+getDescription().hashCode()+new Boolean(getMandatory()).hashCode());
+		return Math.abs(Boolean.valueOf(getResult()).hashCode()+getResultMessage().hashCode()+getName().hashCode()+getDescription().hashCode()+Boolean.valueOf(getMandatory()).hashCode());
 	}
 }

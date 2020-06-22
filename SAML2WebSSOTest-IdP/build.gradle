@@ -1,0 +1,15 @@
+plugins {
+	id 'application'
+}
+
+repositories {
+	mavenCentral()
+}
+
+application {
+	mainClassName = 'saml2webssotest.idp.IdPTestRunner'
+}
+
+dependencies {
+	implementation project(":SAML2WebSSOTest-Common")
+}

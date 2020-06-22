@@ -19,7 +19,7 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import org.eclipse.jetty.server.HttpChannel;
+import org.eclipse.jetty.server.HttpConnection;
 import org.eclipse.jetty.server.Request;
 import org.eclipse.jetty.server.handler.AbstractHandler;
 import org.opensaml.common.xml.SAMLConstants;
@@ -59,7 +59,7 @@ public class SamlWebSSOHandler extends AbstractHandler{
 	 */
 	@Override
 	public void handle(String target, Request baseRequest, HttpServletRequest abstractRequest, HttpServletResponse response) throws IOException, ServletException {
-		Request request = (abstractRequest instanceof Request) ? (Request) abstractRequest : HttpChannel.getCurrentHttpChannel().getRequest();
+		Request request = (abstractRequest instanceof Request) ? (Request) abstractRequest : HttpConnection.getCurrentConnection().getHttpChannel().getRequest();
 		method = request.getMethod();
 		samlRequest = null;
 		applicableACS = null;

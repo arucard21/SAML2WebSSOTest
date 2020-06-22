@@ -9,10 +9,10 @@ import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.LinkedList;
-import org.apache.commons.cli.BasicParser;
+
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
+import org.apache.commons.cli.DefaultParser;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
@@ -32,16 +32,14 @@ import com.gargoylesoftware.htmlunit.html.HtmlPage;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonSyntaxException;
 
-import saml2webssotest.common.Interaction;
 import saml2webssotest.common.FormInteraction;
+import saml2webssotest.common.Interaction;
 import saml2webssotest.common.InteractionDeserializer;
 import saml2webssotest.common.LinkInteraction;
 import saml2webssotest.common.MetadataDeserializer;
-import saml2webssotest.common.TestResult;
-import saml2webssotest.common.TestRunnerUtil;
-import saml2webssotest.common.TestStatus;
-import saml2webssotest.common.TestSuite.TestCase;
+import saml2webssotest.common.TestRunner;
 import saml2webssotest.common.TestSuite.MetadataTestCase;
+import saml2webssotest.common.TestSuite.TestCase;
 import saml2webssotest.idp.mockSPHandlers.SamlWebSSOHandler;
 import saml2webssotest.idp.testsuites.IdPTestSuite;
 import saml2webssotest.idp.testsuites.IdPTestSuite.ConfigTestCase;
@@ -56,7 +54,8 @@ import saml2webssotest.idp.testsuites.IdPTestSuite.ResponseTestCase;
  * @author RiaasM
  * 
  */
-public class IdPTestRunner {
+public class IdPTestRunner extends TestRunner {
+    	private static IdPTestRunner instance = null;
 	/**
 	 * Logger for this class
 	 */
@@ -95,187 +94,131 @@ public class IdPTestRunner {
 	 * Contains the command-line options
 	 */
 	private static CommandLine command;
-
-	public static void main(String[] args) {		
-		// initialize logging with properties file if it exists, basic config otherwise
-		if(Files.exists(Paths.get(logFile))){
-			PropertyConfigurator.configure(logFile);
+	
+	public IdPTestRunner(String[] args) {
+	    // initialize logging with properties file if it exists, basic config otherwise
+	    if (Files.exists(Paths.get(logFile))) {
+		PropertyConfigurator.configure(logFile);
+	    } else {
+		BasicConfigurator.configure();
+	    }
+	    // define the command-line options
+	    Options options = new Options();
+	    options.addOption("h", "help", false, "Print this help message");
+	    options.addOption("i", "insecure", false, "Do not verify HTTPS server certificates");
+	    options.addOption("c", "idpconfig", true,
+		    "The name of the properties file containing the configuration of the target SP");
+	    options.addOption("l", "listTestcases", false, "List all the test cases");
+	    options.addOption("L", "listTestsuites", false, "List all the test suites");
+	    options.addOption("m", "metadata", false, "Display the mock IdP metadata");
+	    options.addOption("T", "testsuite", true,
+		    "Specifies the test suite from which you wish to run a test case");
+	    options.addOption("t", "testcase", true,
+		    "The name of the test case you wish to run. If omitted, all test cases from the test suite are run");
+	    try {
+		// parse the command-line arguments
+		CommandLineParser parser = new DefaultParser();
+		// parse the command line arguments
+		command = parser.parse(options, args);
+		// show the help message
+		if (command.hasOption("help")) {
+		    new HelpFormatter().printHelp("SPTestRunner", options, true);
+		    System.exit(0);
 		}
-		else{
-			BasicConfigurator.configure();
+		// list the test suites, if necessary
+		if (command.hasOption("listTestsuites")) {
+		    listTestSuites(IdPTestRunner.class.getPackage().getName() + "." + testSuitesPackage);
+		    System.exit(0);
 		}
-		
-		// define the command-line options
-		Options options = new Options();
-		options.addOption("h", "help", false, "Print this help message");
-		options.addOption("i", "insecure", false,"Do not verify HTTPS server certificates");
-		options.addOption("c", "idpconfig", true,"The name of the properties file containing the configuration of the target SP");
-		options.addOption("l", "listTestcases", false,"List all the test cases");
-		options.addOption("L", "listTestsuites", false,"List all the test suites");
-		options.addOption("m", "metadata", false,"Display the mock IdP metadata");
-		options.addOption("T", "testsuite", true,"Specifies the test suite from which you wish to run a test case");
-		options.addOption("t","testcase",true,"The name of the test case you wish to run. If omitted, all test cases from the test suite are run");
+		if (command.hasOption("testsuite")) {
+		    // load the test suite
+		    String ts_string = command.getOptionValue("testsuite");
+		    Class<?> ts_class = Class.forName(
+			    IdPTestRunner.class.getPackage().getName() + "." + testSuitesPackage + "." + ts_string);
+		    Object testsuiteObj = ts_class.getConstructor().newInstance();
+		    if (testsuiteObj instanceof IdPTestSuite) {
+			testsuite = (IdPTestSuite) testsuiteObj;
+			// list the test cases, if necessary
+			if (command.hasOption("listTestcases")) {
+			    listTestCases(testsuite);
+			    System.exit(0);
+			}
+			// show mock IdP metadata
+			if (command.hasOption("metadata")) {
+			    outputMockedMetadata(testsuite);
+			    System.exit(0);
+			}
+			// load target SP config
+			if (command.hasOption("idpconfig")) {
+			    idpConfig = new GsonBuilder()
+				    .registerTypeAdapter(Document.class, new MetadataDeserializer())
+				    .registerTypeAdapter(Interaction.class, new InteractionDeserializer()).create()
+				    .fromJson(Files.newBufferedReader(Paths.get(command.getOptionValue("idpconfig")),
+					    Charset.defaultCharset()), IdPConfiguration.class);
+			} else {
+			    logger.error("No IdP configuration was found, this is required in order to run any test");
+			    System.exit(-1);
+			}
 
-		LinkedList<TestResult> testresults = new LinkedList<TestResult>();
+			// load the requested test case(s)
+			testcaseName = command.getOptionValue("testcase");
+		    } else {
+			logger.error("Provided class was not a TestSuite");
+		    }
+		}
+	    } catch (ClassNotFoundException e) {
+		// test suite or case could not be found
+		if (testsuite == null)
+		    logger.error("Test suite could not be found", e);
+		else
+		    logger.error("Test case could not be found", e);
+	    } catch (ClassCastException e) {
+		logger.error("The test suite or case was not an instance of TestSuite", e);
+	    } catch (InstantiationException e) {
+		logger.error("Could not instantiate an instance of the test suite or case", e);
+	    } catch (IllegalAccessException e) {
+		logger.error("Could not access the test suite class or test case class", e);
+	    } catch (IOException e) {
+		logger.error("I/O error occurred when creating HTTP server", e);
+	    } catch (ParseException e) {
+		logger.error("Parsing of the command-line arguments has failed", e);
+	    } catch (IllegalArgumentException e) {
+		logger.error("Could not create a new instance of the test case", e);
+	    } catch (InvocationTargetException e) {
+		logger.error("Could not create a new instance of the test case", e);
+	    } catch (NoSuchMethodException e) {
+		logger.error("Could not retrieve the constructor of the test case class", e);
+	    } catch (SecurityException e) {
+		logger.error("Could not retrieve the constructor of the test case class", e);
+	    } catch (JsonSyntaxException jsonExc) {
+		logger.error("The JSON configuration file did not have the correct syntax", jsonExc);
+	    } catch (Exception e) {
+		logger.error("The test(s) could not be run", e);
+	    } finally {
+		// stop the mock IdP
 		try {
-			// parse the command-line arguments
-			CommandLineParser parser = new BasicParser();
-
-			// parse the command line arguments
-			command = parser.parse(options, args);
-
-			// show the help message
-			if (command.hasOption("help")) {
-				new HelpFormatter().printHelp("SPTestRunner", options, true);
-				System.exit(0);
-			}
-
-			// list the test suites, if necessary
-			if (command.hasOption("listTestsuites")) {
-				TestRunnerUtil.listTestSuites(IdPTestRunner.class.getPackage().getName() + "." + testSuitesPackage);
-				System.exit(0);
-			}
-
-			if (command.hasOption("testsuite")) {
-				// load the test suite
-				String ts_string = command.getOptionValue("testsuite");
-				Class<?> ts_class = Class.forName(IdPTestRunner.class.getPackage().getName() +"."+ testSuitesPackage +"."+ ts_string);
-				Object testsuiteObj = ts_class.newInstance();
-				if (testsuiteObj instanceof IdPTestSuite) {
-					testsuite = (IdPTestSuite) testsuiteObj;
-
-					// list the test cases, if necessary
-					if (command.hasOption("listTestcases")) {
-						TestRunnerUtil.listTestCases(testsuite);
-						System.exit(0);
-					}
-
-					// show mock IdP metadata
-					if (command.hasOption("metadata")) {
-						TestRunnerUtil.outputMockedMetadata(testsuite);
-						System.exit(0);
-					}
-
-					// load target SP config
-					if (command.hasOption("idpconfig")) {
-						idpConfig = new GsonBuilder()
-											.registerTypeAdapter(Document.class, new MetadataDeserializer())
-											.registerTypeAdapter(Interaction.class, new InteractionDeserializer())
-											.create()
-											.fromJson(Files.newBufferedReader(Paths.get(command.getOptionValue("idpconfig")),Charset.defaultCharset()), IdPConfiguration.class); 
-					} else {
-						logger.error("No IdP configuration was found, this is required in order to run any test");
-						System.exit(-1);
-					}
-
-					// create the mock IdP and add all required handlers
-					mockSP = new Server(
-							new InetSocketAddress(
-										testsuite.getMockSPURL().getHost(),
-										testsuite.getMockSPURL().getPort()));
-					
-					// add a context handler to properly handle the sso path
-					ContextHandler context = new ContextHandler();
-					context.setContextPath(testsuite.getMockSPURL().getPath());
-					mockSP.setHandler(context);
-
-					// add the SAML Request handler for all services
-					mockSP.setHandler(new SamlWebSSOHandler());
-					// add the SAML Response handler
-
-					// start the mock IdP
-					mockSP.start();
-
-					// TODO: possibly use Reflections for easier access to test cases
-					
-					// load the requested test case(s)
-					String tc_string = command.getOptionValue("testcase");
-					if (tc_string != null && !tc_string.isEmpty()) {
-						Class<?> tc_class = Class.forName(testsuite.getClass().getName() + "$" + tc_string);
-						Object testcaseObj = tc_class.getConstructor(testsuite.getClass()).newInstance(testsuite);
-						// run test
-						if (testcaseObj instanceof TestCase) {
-							TestCase testcase = (TestCase) testcaseObj;
-							TestStatus status = runTest(testcase);
-							String message = "";
-							if (status == TestStatus.OK){
-								message = testcase.getSuccessMessage();
-							}
-							else{
-								message = testcase.getFailedMessage();
-							}
-							TestResult result = new TestResult(status, message);
-							result.setName(testcase.getClass().getSimpleName());
-							result.setDescription(testcase.getDescription());
-							testresults.add(result);
-						} else {
-							logger.error("Provided class was not a subclass of interface TestCase");
-						}
-					} else {
-						// run all test cases from the test suite, ignore
-						// classes that are not subclasses of TestCase
-						Class<?>[] allTCs = ts_class.getDeclaredClasses();
-						for (Class<?> testcaseClass : allTCs) {
-							TestCase curTestcase = (TestCase) testcaseClass.getConstructor(testsuite.getClass()).newInstance(testsuite);
-							TestStatus status = runTest(curTestcase);
-							String message = "";
-							if (status == TestStatus.OK){
-								message = curTestcase.getSuccessMessage();
-							}
-							else{
-								message = curTestcase.getFailedMessage();
-							}
-							TestResult result = new TestResult(status, message);
-							result.setName(curTestcase.getClass().getSimpleName());
-							result.setDescription(curTestcase.getDescription());
-							//outputTestResult(result);
-							testresults.add(result);
-						}
-					}
-					TestRunnerUtil.outputTestResults(testresults);
-				} else {
-					logger.error("Provided class was not a TestSuite");
-				}
-			}
-		} catch (ClassNotFoundException e) {
-			// test suite or case could not be found
-			if (testsuite == null)
-				logger.error("Test suite could not be found", e);
-			else
-				logger.error("Test case could not be found", e);
-			testresults.add(new TestResult(TestStatus.CRITICAL, ""));
-		} catch (ClassCastException e) {
-			logger.error("The test suite or case was not an instance of TestSuite", e);
-		} catch (InstantiationException e) {
-			logger.error("Could not instantiate an instance of the test suite or case", e);
-		} catch (IllegalAccessException e) {
-			logger.error("Could not access the test suite class or test case class", e);
-		} catch (IOException e) {
-			logger.error("I/O error occurred when creating HTTP server", e);
-		} catch (ParseException e) {
-			logger.error("Parsing of the command-line arguments has failed", e);
-		} catch (IllegalArgumentException e) {
-			logger.error("Could not create a new instance of the test case", e);
-		} catch (InvocationTargetException e) {
-			logger.error("Could not create a new instance of the test case", e);
-		} catch (NoSuchMethodException e) {
-			logger.error("Could not retrieve the constructor of the test case class", e);
-		} catch (SecurityException e) {
-			logger.error("Could not retrieve the constructor of the test case class", e);
-		} catch (JsonSyntaxException jsonExc) {
-			logger.error("The JSON configuration file did not have the correct syntax", jsonExc);
+		    if (mockSP != null && mockSP.isStarted()) {
+			mockSP.stop();
+		    }
 		} catch (Exception e) {
-			logger.error("The test(s) could not be run", e);
-		} finally {
-			// stop the mock IdP
-			try {
-				if (mockSP!= null && mockSP.isStarted()){
-					mockSP.stop();
-				}
-			} catch (Exception e) {
-				logger.error("The mock SP could not be stopped", e);
-			}
+		    logger.error("The mock SP could not be stopped", e);
 		}
+	    }
+	}
+
+	public static void main(String[] args) {
+	    if (instance == null) {
+		instance = new IdPTestRunner(args);
+	    } else {
+		System.out
+			.println("SPTestRunner is already running, only one instance can be running at the same time");
+	    }
+	    instance.runTestSuite(instance.getMainTestSuite());
+	    instance.outputTestResults();
+	    
+	    
+	    
+		
 	}
 
 	/**
@@ -288,7 +231,8 @@ public class IdPTestRunner {
 	 *            target SP
 	 * @return a string representing the test result in JSON format.
 	 */
-	private static TestStatus runTest(TestCase testcase) {
+	@Override
+	public boolean runTest(TestCase testcase) {
 		logger.info("Running testcase: "+ testcase.getClass().getSimpleName());
 		
 		browser.getOptions().setRedirectEnabled(true);
@@ -329,11 +273,11 @@ public class IdPTestRunner {
 				return reqTC.checkResponse(samlResponse,samlResponseBinding);
 			} else {
 				logger.error("Could not retrieve the SAML Request that was sent by the target SP");
-				return TestStatus.CRITICAL;
+				return false;
 			}
 		} else {
 			logger.error("Trying to run an unknown type of test case");
-			return null;
+			return false;
 		}
 	}
 
@@ -443,5 +387,38 @@ public class IdPTestRunner {
 	 */
 	public static IdPConfiguration getIdPConfig() {
 		return idpConfig;
+	}
+
+	@Override
+	public void initMockServer() {
+	    // create the mock SP server and add all required handlers
+	    mockSP = new Server(
+		    new InetSocketAddress(testsuite.getMockSPURL().getHost(), testsuite.getMockSPURL().getPort()));
+	    // add a context handler to properly handle the sso path
+	    ContextHandler context = new ContextHandler();
+	    context.setContextPath(testsuite.getMockSPURL().getPath());
+	    mockSP.setHandler(context);
+	    // add the SAML Request handler for all services
+	    mockSP.setHandler(new SamlWebSSOHandler());
+	    // add the SAML Response handler
+	    // start the mock IdP
+	    try {
+		mockSP.start();
+	    } catch (Exception e) {
+		e.printStackTrace();
+		logger.error("Mock SP server would not start");
+	    }
+	}
+
+	@Override
+	public void killMockServer() {
+	    // TODO Auto-generated method stub
+	    
+	}
+
+	@Override
+	public void loadConfig(String optionValue) {
+	    // TODO Auto-generated method stub
+	    
 	}
 }

@@ -4,12 +4,14 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.opensaml.common.xml.SAMLConstants;
+import org.opensaml.saml2.metadata.Endpoint;
+import org.opensaml.saml2.metadata.SingleSignOnService;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
 import saml2webssotest.common.Interaction;
-import saml2webssotest.common.standardNames.MD;
 
 public class IdPConfiguration {
 	/**
@@ -52,7 +54,7 @@ public class IdPConfiguration {
 			return null;
 		
 		ArrayList<Node> nodes = new ArrayList<Node>();
-		NodeList allNodes = metadata.getElementsByTagNameNS(MD.NAMESPACE, tagName);
+		NodeList allNodes = metadata.getElementsByTagNameNS(SAMLConstants.SAML20MD_NS, tagName);
 		//convert NodeList to List of Node objects
 		for (int i = 0; i < allNodes.getLength(); i++){
 			nodes.add(allNodes.item(i));
@@ -74,7 +76,7 @@ public class IdPConfiguration {
 			return null;
 		
 		ArrayList<String> resultAttributes = new ArrayList<String>();
-		NodeList allACS = metadata.getElementsByTagNameNS(MD.NAMESPACE, tagName);
+		NodeList allACS = metadata.getElementsByTagNameNS(SAMLConstants.SAML20MD_NS, tagName);
 		for (int i = 0; i < allACS.getLength(); i++){
 			Node acs = allACS.item(i);
 			resultAttributes.add(acs.getAttributes().getNamedItem(attrName).getNodeValue());
@@ -111,13 +113,13 @@ public class IdPConfiguration {
 	 * @return the location for the requested binding or null if it is not found
 	 */
 	public String getMDSSOLocation(String binding) {
-		ArrayList<Node> ssoNodes = (ArrayList<Node>) getMDNodes(MD.SINGLESIGNONSERVICE);
+		ArrayList<Node> ssoNodes = (ArrayList<Node>) getMDNodes(SingleSignOnService.DEFAULT_ELEMENT_LOCAL_NAME);
 		// check all ACS nodes for the requested binding
 		for (Node sso : ssoNodes) {
-			if (sso.getAttributes().getNamedItem(MD.BINDING)
+			if (sso.getAttributes().getNamedItem(Endpoint.BINDING_ATTRIB_NAME)
 					.getNodeValue().equalsIgnoreCase(binding))
 				// return the location for the requested binding
-				return sso.getAttributes().getNamedItem(MD.LOCATION)
+				return sso.getAttributes().getNamedItem(Endpoint.LOCATION_ATTRIB_NAME)
 						.getNodeValue();
 		}
 		// the requested binding could not be found

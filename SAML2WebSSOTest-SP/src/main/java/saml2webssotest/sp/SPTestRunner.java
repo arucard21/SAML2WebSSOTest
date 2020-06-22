@@ -1,6 +1,7 @@
 package saml2webssotest.sp;
 
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.charset.Charset;
@@ -13,8 +14,8 @@ import java.util.regex.Pattern;
 
 import javax.net.ssl.SSLHandshakeException;
 
-import org.apache.commons.cli.BasicParser;
 import org.apache.commons.cli.CommandLine;
+import org.apache.commons.cli.DefaultParser;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
@@ -39,8 +40,8 @@ import saml2webssotest.common.InteractionDeserializer;
 import saml2webssotest.common.MetadataDeserializer;
 import saml2webssotest.common.StringPair;
 import saml2webssotest.common.TestRunner;
-import saml2webssotest.common.TestSuite.TestCase;
 import saml2webssotest.common.TestSuite.MetadataTestCase;
+import saml2webssotest.common.TestSuite.TestCase;
 import saml2webssotest.sp.mockIdPHandlers.SamlWebSSOHandler;
 import saml2webssotest.sp.testsuites.SPTestSuite;
 import saml2webssotest.sp.testsuites.SPTestSuite.ConfigTestCase;
@@ -96,7 +97,7 @@ public class SPTestRunner extends TestRunner {
 	 */
 	private String testSuitesPackage = "testsuites";
 
-	private SPTestRunner(String[] args) {
+	private SPTestRunner(String[] args) throws IllegalArgumentException, InvocationTargetException, NoSuchMethodException, SecurityException {
 		// initialize logging with properties file if it exists, basic config otherwise
 		if (Files.exists(Paths.get(logFile))) {
 			PropertyConfigurator.configure(logFile);
@@ -119,7 +120,7 @@ public class SPTestRunner extends TestRunner {
 			options.addOption("t","testcase",true,"The name of the test case you wish to run. If omitted, all test cases from the test suite are run");
 
 			// parse the command line arguments
-			command = new BasicParser().parse(options, args);
+			command = new DefaultParser().parse(options, args);
 
 			// show the help message
 			if (command.hasOption("help")) {
@@ -137,7 +138,7 @@ public class SPTestRunner extends TestRunner {
 				// load the test suite
 				String ts_string = command.getOptionValue("testsuite");
 				Class<?> ts_class = Class.forName(SPTestRunner.class.getPackage().getName() + "." + testSuitesPackage + "." + ts_string);
-				Object testsuiteObj = ts_class.newInstance();
+				Object testsuiteObj = ts_class.getConstructor().newInstance();
 				if (testsuiteObj instanceof SPTestSuite) {
 					testsuite = (SPTestSuite) testsuiteObj;
 
@@ -196,7 +197,7 @@ public class SPTestRunner extends TestRunner {
 		}
 	}
 
-	public static void main(String[] args) {
+	public static void main(String[] args) throws IllegalArgumentException, InvocationTargetException, NoSuchMethodException, SecurityException {
 		if (instance == null){
 			instance = new SPTestRunner(args);
 		}
@@ -369,7 +370,7 @@ public class SPTestRunner extends TestRunner {
 					
 					browser.getOptions().setUseInsecureSSL(true);
 					// reset browser to apply setting
-					browser.closeAllWindows();
+					browser.close();
 					startPage = browser.getPage(spConfig.getStartPage());
 					// reset insecure SSL option for future use
 					browser.getOptions().setUseInsecureSSL(false);
@@ -388,7 +389,7 @@ public class SPTestRunner extends TestRunner {
 					
 					browser.getOptions().setUseInsecureSSL(true);
 					// reset browser to apply setting
-					browser.closeAllWindows();
+					browser.close();
 					responsePage = browser.getPage(testsuite.getMockServerURL().toString());
 					// reset insecure SSL option for future use
 					browser.getOptions().setUseInsecureSSL(false);
@@ -399,10 +400,10 @@ public class SPTestRunner extends TestRunner {
 					&& checkLoginURL(responsePage) 
 					&& checkLoginContent(responsePage) 
 					&& checkLoginCookies(browser.getCookies(responsePage.getUrl()))) {
-				return new Boolean(true);
+				return Boolean.valueOf(true);
 			}
 			else{
-				return new Boolean(false);
+				return Boolean.valueOf(false);
 			}
 		} catch (ScriptException e){
 			logger.error("Could not correctly redirect back to target SP", e);

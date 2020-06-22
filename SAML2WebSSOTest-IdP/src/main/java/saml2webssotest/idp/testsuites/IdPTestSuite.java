@@ -18,7 +18,7 @@ import java.security.interfaces.RSAPrivateKey;
 import java.util.UUID;
 
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
-import org.bouncycastle.openssl.PEMReader;
+import org.bouncycastle.openssl.PEMParser;
 import org.joda.time.DateTime;
 import org.opensaml.Configuration;
 import org.opensaml.DefaultBootstrap;
@@ -36,16 +36,15 @@ import org.opensaml.saml2.core.StatusCode;
 import org.opensaml.saml2.core.Subject;
 import org.opensaml.saml2.core.SubjectConfirmation;
 import org.opensaml.saml2.core.SubjectConfirmationData;
+import org.opensaml.saml2.metadata.EntityDescriptor;
 import org.opensaml.xml.ConfigurationException;
 import org.opensaml.xml.XMLObjectBuilderFactory;
 import org.opensaml.xml.security.x509.BasicX509Credential;
 import org.opensaml.xml.security.x509.X509Credential;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import saml2webssotest.common.TestStatus;
+
 import saml2webssotest.common.TestSuite;
-import saml2webssotest.common.standardNames.MD;
-import saml2webssotest.common.standardNames.SAMLmisc;
 import saml2webssotest.idp.IdPConfiguration;
 import saml2webssotest.idp.IdPTestRunner;
 
@@ -196,7 +195,7 @@ public abstract class IdPTestSuite implements TestSuite {
 		try {
 			BufferedReader br = new BufferedReader(new StringReader(key));
 			Security.addProvider(new BouncyCastleProvider());
-			PEMReader pr = new PEMReader(br);
+			PEMParser pr = new PEMParser(br);
 			KeyPair kp = (KeyPair) pr.readObject();
 			pr.close();
 			br.close();
@@ -252,21 +251,21 @@ public abstract class IdPTestSuite implements TestSuite {
 		AuthnContextClassRef authncontextclassref = (AuthnContextClassRef) builderfac.getBuilder(AuthnContextClassRef.DEFAULT_ELEMENT_NAME).buildObject(AuthnContextClassRef.DEFAULT_ELEMENT_NAME);
 
 		// create status for Response
-		statuscode.setValue(SAMLmisc.STATUS_SUCCESS);
+		statuscode.setValue(StatusCode.SUCCESS_URI);
 		status.setStatusCode(statuscode);
 		// create Issuer for Assertion 
 		issuer.setValue(getmockSPEntityID());
 		// create Subject for Assertion
 		subjectconfdata.setNotOnOrAfter(DateTime.now().plusMinutes(15));
 		subjectconf.setSubjectConfirmationData(subjectconfdata);
-		subjectconf.setMethod(SAMLmisc.CONFIRMATION_METHOD_BEARER);
+		subjectconf.setMethod(SubjectConfirmation.METHOD_BEARER);
 		subject.getSubjectConfirmations().add(subjectconf);
 		// create Conditions for Assertion
-		aud.setAudienceURI(sp.getMDAttribute(MD.ENTITYDESCRIPTOR, MD.ENTITYID));
+		aud.setAudienceURI(sp.getMDAttribute(EntityDescriptor.DEFAULT_ELEMENT_LOCAL_NAME, EntityDescriptor.ENTITY_ID_ATTRIB_NAME));
 		audRes.getAudiences().add(aud);
 		conditions.getAudienceRestrictions().add(audRes);
 		// create AuthnStatement for Assertion
-		authncontextclassref.setAuthnContextClassRef(SAMLmisc.AUTHNCONTEXT_PASSWORD);
+		authncontextclassref.setAuthnContextClassRef(AuthnContext.PASSWORD_AUTHN_CTX);
 		authncontext.setAuthnContextClassRef(authncontextclassref);
 		authnstatement.setAuthnContext(authncontext);
 		authnstatement.setAuthnInstant(DateTime.now());
@@ -294,7 +293,7 @@ public abstract class IdPTestSuite implements TestSuite {
 		 * 
 		 * @return the status of the test
 		 */
-		TestStatus checkConfig(IdPConfiguration config);
+		boolean checkConfig(IdPConfiguration config);
 	}
 
 	public interface ResponseTestCase extends TestCase {
@@ -311,6 +310,6 @@ public abstract class IdPTestSuite implements TestSuite {
 		 * 
 		 * @return the status of the test
 		 */
-		TestStatus checkResponse(String response, String binding);
+		boolean checkResponse(String response, String binding);
 	}
 }

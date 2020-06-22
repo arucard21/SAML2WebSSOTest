@@ -23,7 +23,7 @@ import java.util.UUID;
 import javax.xml.namespace.QName;
 
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
-import org.bouncycastle.openssl.PEMReader;
+import org.bouncycastle.openssl.PEMParser;
 import org.joda.time.DateTime;
 import org.opensaml.Configuration;
 import org.opensaml.DefaultBootstrap;
@@ -274,7 +274,7 @@ public abstract class SPTestSuite implements TestSuite {
 		try {
 			BufferedReader br = new BufferedReader(new StringReader(key));
 			Security.addProvider(new BouncyCastleProvider());
-			PEMReader pr = new PEMReader(br);
+			PEMParser pr = new PEMParser(br);
 			KeyPair kp = (KeyPair) pr.readObject();
 			pr.close();
 			br.close();
